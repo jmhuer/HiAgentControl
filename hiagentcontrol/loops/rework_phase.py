@@ -27,7 +27,9 @@ def choose_rework_phase(*, report: EvaluatorReport) -> ReworkPhase:
         return ReworkPhase.PI
 
     if failed <= {"plan-task-count"}:
-        return ReworkPhase.PI
+        # Count mismatch can usually be fixed by formatter trimming/expanding tasks
+        # without forcing PI replanning.
+        return ReworkPhase.FORMAT
 
     if failed <= {"plan-json-schema", "plan-task-scope"} or failed <= {
         "plan-json-schema",

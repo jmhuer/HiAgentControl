@@ -31,8 +31,8 @@ def build_follow_up_work_items(*, report: EvaluatorReport) -> list[FollowUpWorkI
 
 
 def _suggest_action(check_name: str) -> str:
-    if check_name in {"plan-json-schema", "plan-json-exists", "plan-task-scope"}:
-        return "Run structure retry; fix task scope with TRY:/FILES:/CHANGE: labels."
+    if check_name in {"plan-json-schema", "plan-json-exists", "plan-task-scope", "plan-task-count"}:
+        return "Run structure retry; fix JSON shape/scope/task count and rerun gate."
     if check_name == "ai-review":
         return "Prometheus replans; executors augment draft.md evidence before structure."
     return "Prometheus delegates executor fix task; re-evaluate after draft/plan updated."

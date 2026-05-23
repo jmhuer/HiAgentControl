@@ -176,6 +176,20 @@ def main() -> None:
     elif rework.is_file() and not args.no_clean:
         pass  # already removed by clean_for_fresh_run
 
+    # Pre-create files Atlas/formatter expect under strict edit/append policies.
+    state_dir = workdir / "state/current"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    draft_path = state_dir / "draft.md"
+    if not draft_path.exists():
+        draft_path.write_text("# Draft\n\n", encoding="utf-8")
+
+    notepad_dir = workdir / ".omo/notepads/plan"
+    notepad_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("learnings.md", "decisions.md", "issues.md", "verification.md", "problems.md"):
+        f = notepad_dir / name
+        if not f.exists():
+            f.write_text(f"# {name[:-3].title()}\n\n", encoding="utf-8")
+
     _log("=" * 60)
     _log("HiAgentControl — OMO single-session plan loop")
     _log(f"  workdir:    {workdir}")

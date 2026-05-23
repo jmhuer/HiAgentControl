@@ -60,6 +60,24 @@ def test_choose_rework_phase_format_for_schema() -> None:
     assert choose_rework_phase(report=report) == ReworkPhase.FORMAT
 
 
+
+
+def test_choose_rework_phase_format_for_count_mismatch() -> None:
+    report = EvaluatorReport(
+        passed=False,
+        summary="fail",
+        checks=[
+            ReportCheck(
+                name="plan-task-count",
+                passed=False,
+                detail="count mismatch",
+                target_ref="plan.json#tasks",
+            )
+        ],
+    )
+    assert choose_rework_phase(report=report) == ReworkPhase.FORMAT
+
+
 def test_choose_rework_phase_pi_for_missing() -> None:
     report = EvaluatorReport(
         passed=False,
@@ -109,7 +127,7 @@ def test_run_gate_fails_wrong_count(tmp_path: Path, capsys) -> None:
     passed, _ = run_gate(workdir=workdir, num_tasks=2)
     assert not passed
     rework = (workdir / "state/current/targeted_rework.md").read_text(encoding="utf-8")
-    assert "rework_phase: pi" in rework
+    assert "rework_phase: format" in rework
 
 
 def test_write_targeted_rework_includes_phase(tmp_path: Path) -> None:
