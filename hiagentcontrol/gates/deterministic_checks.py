@@ -141,7 +141,7 @@ def validate_plan_task_scopes(*, plan_json_path: Path) -> CheckResult:
 
 
 def validate_plan_task_count(
-    *, plan_json_path: Path, min_tasks: int
+    *, plan_json_path: Path, min_tasks: int, exact_tasks: int | None = None
 ) -> CheckResult:
     if not plan_json_path.exists():
         return CheckResult(
@@ -162,18 +162,30 @@ def validate_plan_task_count(
             target_ref=str(plan_json_path),
         )
     count = len(plan.tasks)
-    passed = count >= min_tasks
-    return CheckResult(
-        name="plan-task-count",
-        passed=passed,
-        detail=(
+    if exact_tasks is not None:
+        passed = count == exact_tasks
+        detail = (
+            f"Task count exact match: {count} tasks (required exactly {exact_tasks})."
+            if passed
+            else (
+                f"Task count mismatch: plan.json has {count} tasks, "
+                f"required exactly {exact_tasks}."
+            )
+        )
+    else:
+        passed = count >= min_tasks
+        detail = (
             f"Task requirement met: {count} tasks (required {min_tasks})."
             if passed
             else (
                 f"Lack of task requirements: plan.json has {count} tasks, "
                 f"required {min_tasks}."
             )
-        ),
+        )
+    return CheckResult(
+        name="plan-task-count",
+        passed=passed,
+        detail=detail,
         target_ref=f"{plan_json_path}#tasks",
     )
 

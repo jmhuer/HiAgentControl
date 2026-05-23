@@ -24,10 +24,15 @@ class GlobalEvaluationNode:
         deliverable_path: Path,
         gate: GateDefinition | None,
         min_tasks: int = 1,
+        exact_tasks: int | None = None,
     ) -> EvaluationOutcome:
         checks: list[CheckResult] = list(validate_plan_json(plan_json_path=deliverable_path))
         checks.append(
-            validate_plan_task_count(plan_json_path=deliverable_path, min_tasks=min_tasks)
+            validate_plan_task_count(
+                plan_json_path=deliverable_path,
+                min_tasks=min_tasks,
+                exact_tasks=exact_tasks,
+            )
         )
         checks.append(validate_plan_task_scopes(plan_json_path=deliverable_path))
         if gate:

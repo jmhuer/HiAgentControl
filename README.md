@@ -4,14 +4,14 @@ Hierarchical agent control: gated planning with oh-my-openagent (OMO) and determ
 
 ## What it does
 
-The **plan-only loop** runs three OMO phases, then gates the deliverable:
+The **plan loop** uses one OMO session (`/ulw-loop` + project skills) with four phases:
 
-1. **Prometheus** — manager plan in `.omo/plans/*.md` (where to look; delegates research)
-2. **Atlas** — research draft in `state/current/draft.md`
-3. **Sisyphus** — structured `state/current/plan.json` (`PlanDefinition` schema)
-4. **Python gates** — schema, task count, scope labels (`TRY` / `FILES` / `CHANGE` / `VERIFY`)
+1. **Prometheus (PI)** — `.omo/plans/*.md`
+2. **Atlas (postdoc)** — `state/current/draft.md`
+3. **Sisyphus-Junior (formatter)** — `state/current/plan.json` via skill `hac-format-plan-json`
+4. **Python gate** — `run_plan_gate.py` prints `<promise>DONE</promise>` when valid
 
-OMO owns agents, delegation, and in-session continuation. Python only invokes `oh-my-opencode run` and validates files on disk.
+Python invokes `oh-my-openagent run` once and validates artifacts on disk. Legacy three-subprocess mode: `--legacy-three-phase`.
 
 ## Repository layout
 
@@ -44,14 +44,49 @@ cp credentials/apikey.txt.example credentials/apikey.txt
 # fill credentials/apikey.txt — see credentials/README.md
 ```
 
-## Run plan-only loop
+## Run plan loop (default: single OMO session)
+
+**Quick retry** (cleans stale artifacts, sets env, runs loop):
+
+```bash
+chmod +x scripts/rerun_plan_loop.sh
+./scripts/rerun_plan_loop.sh --num-tasks 5
+```
+
+Structure-only when `draft.md` is already good (keeps draft, clears `plan.json`):
+
+```bash
+./scripts/rerun_plan_loop.sh --structure-only --num-tasks 5
+```
+
+Manual:
+
+```bash
+PYTHONPATH=. python -m hiagentcontrol.tools.run_omo_plan_loop \
+  --workdir mnist \
+  --num-tasks 5 \
+  --timeout-sec 3600
+```
+
+By default each run **removes** prior `draft.md`, `plan.json`, gate reports, `.omo/plans/`, and OMO logs so agents do not inherit a partial prior loop. Use `--no-clean` to continue with existing artifacts.
+
+Legacy PLAN → DRAFT → STRUCTURE subprocesses:
 
 ```bash
 PYTHONPATH=. python -m hiagentcontrol.tools.run_plan_only_loop \
-  --workdir mnist \
-  --num-tasks 3 \
-  --max-retries 2 \
-  --timeout-sec 1800
+  --workdir mnist --num-tasks 5 --legacy-three-phase
+```
+
+Gate only:
+
+```bash
+PYTHONPATH=. python -m hiagentcontrol.tools.run_plan_gate --workdir mnist --num-tasks 5
+```
+
+Pre-gate lint (for structure agents — same rules, no `<promise>DONE</promise>`):
+
+```bash
+PYTHONPATH=. python -m hiagentcontrol.tools.lint_plan_json --workdir mnist --num-tasks 5
 ```
 
 Outputs (local, gitignored): `mnist/.omo/plans/`, `mnist/state/current/draft.md`, `mnist/state/current/plan.json`.

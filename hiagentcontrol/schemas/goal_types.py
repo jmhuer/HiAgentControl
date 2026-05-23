@@ -11,4 +11,6 @@ class GoalType(StrEnum):
     ARCHITECTURE = "architecture"
     HYGIENE = "hygiene"
     SURVEY = "survey"
+    CODEBASE_RECON = "codebase_recon"
+    EXPERIMENT = "experiment"
 

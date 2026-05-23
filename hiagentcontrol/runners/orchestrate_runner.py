@@ -59,6 +59,10 @@ class OrchestrateRunner:
             "## Tooling reminder",
             "- Persist plan with **edit** only (write is denied).",
             "- Path: `.omo/plans/<name>.md`",
+            "",
+            "## PLAN phase constraints (override bootstrap tools list)",
+            "- Do **not** call `task()`, `call_omo_agent`, or `background_output` in this session.",
+            "- Scope with **read / grep / glob** only; put web and librarian work in the plan as Atlas delegations.",
         ]
         if evaluator_report_path and evaluator_report_path.exists():
             prompt_parts.append(f"Prior gate failures: `{evaluator_report_path}`")

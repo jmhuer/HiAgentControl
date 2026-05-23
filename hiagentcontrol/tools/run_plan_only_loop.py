@@ -50,17 +50,47 @@ def _args() -> argparse.Namespace:
         metavar="N",
         help="Minimum tasks in plan.json (plan-task-count gate). Alias: --no-tasks",
     )
+    parser.add_argument(
+        "--legacy-three-phase",
+        action="store_true",
+        help="Use legacy PLAN→DRAFT→STRUCTURE subprocess loop (default: use run_omo_plan_loop)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = _args()
+    if not args.legacy_three_phase:
+        import subprocess
+        import sys
+
+        forward = [
+            sys.executable,
+            "-m",
+            "hiagentcontrol.tools.run_omo_plan_loop",
+            "--workdir",
+            args.workdir,
+            "--bootstrap-task",
+            args.bootstrap_task,
+            "--binary",
+            args.binary,
+            "--num-tasks",
+            str(args.num_tasks),
+            "--base-port",
+            str(args.base_port),
+            "--timeout-sec",
+            str(args.timeout_sec),
+        ]
+        if args.run_id.strip():
+            pass  # run_id not used by OMO loop
+        raise SystemExit(subprocess.call(forward))
+
     workdir = Path(args.workdir).resolve()
     bootstrap = Path(args.bootstrap_task).resolve()
     requirements = RunRequirements(num_tasks=args.num_tasks)
 
     _log("=" * 60)
-    _log("HiAgentControl V2 - Plan Only Loop")
+    _log("HiAgentControl V2 - Plan Only Loop (legacy three-phase)")
     _log(f"  workdir:     {workdir}")
     _log(f"  bootstrap:   {bootstrap.name}")
     _log(f"  num_tasks:   {requirements.num_tasks}")

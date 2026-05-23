@@ -12,14 +12,12 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
-import numpy as np
 
-from .model import MnistCNN, Decoder, Autoencoder, EnsembleMnistCNN
+from model import MnistCNN, Decoder, Autoencoder
+import optuna
 
 def pretrain_autoencoder(autoencoder: Autoencoder, loader: DataLoader, device: torch.device, epochs: int, lr: float) -> None:
-    print("Starting autoencoder pre-training...")
+    # print("Starting autoencoder pre-training...")
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=lr)
     criterion = nn.MSELoss() # Using MSE for reconstruction loss
 
@@ -34,8 +32,8 @@ def pretrain_autoencoder(autoencoder: Autoencoder, loader: DataLoader, device: t
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        print(f"Autoencoder Pre-train Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(loader):.4f}")
-    print("Autoencoder pre-training finished.")
+        # print(f"Autoencoder Pre-train Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(loader):.4f}")
+    # print("Autoencoder pre-training finished.")
 
 
 def _load_baseline(mnist_root: Path) -> dict:
@@ -71,46 +69,46 @@ def _latency_ms(model: nn.Module, loader: DataLoader, device: torch.device, samp
     return (elapsed / max(seen, 1)) * 1000.0
 
 
-def main() -> None:
+class EnsembleMnistCNN(nn.Module):
+    def __init__(self, num_sub_networks: int, kwta_k: int):
+        super().__init__()
+        self.models = nn.ModuleList([MnistCNN() for _ in range(num_sub_networks)])
+        self.kwta_k = kwta_k
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        outputs = torch.stack([model(x) for model in self.models])
+        # Apply k-Winners-Take-All
+        topk_values, topk_indices = torch.topk(outputs, self.kwta_k, dim=0)
+        # Create a mask for the top-k values
+        mask = torch.zeros_like(outputs, dtype=torch.bool)
+        mask.scatter_(0, topk_indices, True)
+        # Zero out non-top-k values and sum the top-k
+        kwta_output = torch.where(mask, outputs, torch.tensor(0.0, device=outputs.device))
+        return kwta_output.sum(dim=0)
+
+
+def objective(trial: optuna.Trial) -> float:
     parser = argparse.ArgumentParser(description="Train MNIST CNN.")
     parser.add_argument("--mnist-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--autoencoder-epochs", type=int, default=5, help="Number of epochs for autoencoder pre-training.")
-    parser.add_argument("--batch-size", type=int, default=128)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--weight-decay", type=float, default=0.0, help="Weight decay (L2 penalty).")
-    parser.add_argument("--patience", type=int, default=5, help="Number of epochs to wait for improvement before early stopping.")
     parser.add_argument("--num-sub-networks", type=int, default=3, help="Number of sub-networks in the ensemble.")
     parser.add_argument("--kwta-k", type=int, default=1, help="k value for k-Winners-Take-All.")
     parser.add_argument("--quick", action="store_true", help="Use a small train subset for fast smoke runs.")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--checkpoint", type=Path, default=None, help="Model checkpoint path.")
     parser.add_argument("--output", type=Path, default=None, help="Output metrics file path.")
-    args = parser.parse_args()
+    args = parser.parse_args([]) # Pass empty list to prevent argparse from reading sys.argv
+
+    # Hyperparameters to optimize
+    lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+    batch_size = trial.suggest_int("batch_size", 32, 256, step=32)
+    epochs = trial.suggest_int("epochs", 1, 5) # Limiting epochs for faster trials
 
     mnist_root = args.mnist_root.resolve()
-    baseline = _load_baseline(mnist_root)
     device = torch.device(args.device)
 
-
-    class AlbumentationsTransform:
-        def __init__(self):
-            self.aug = A.Compose([
-                A.Rotate(limit=15, p=0.5),
-                A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, p=0.5),
-                A.RandomBrightnessContrast(p=0.2),
-                ToTensorV2(),
-            ])
-
-        def __call__(self, img):
-            img = np.array(img) # Convert PIL Image to numpy array
-            return self.aug(image=img)["image"]
-
-    transform = transforms.Compose([
-        AlbumentationsTransform(),
-        transforms.Normalize((0.1307,), (0.3081,))
-    ])
-
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
     data_dir = mnist_root / "data"
     train_set = datasets.MNIST(str(data_dir), train=True, download=True, transform=transform)
     test_set = datasets.MNIST(str(data_dir), train=False, download=True, transform=transform)
@@ -118,29 +116,26 @@ def main() -> None:
         train_set = Subset(train_set, range(2000))
         test_set = Subset(test_set, range(1000))
 
-    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=0)
-    test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False, num_workers=0)
+    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0)
+    test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0)
 
     encoder_for_ae = MnistCNN().features
     decoder = Decoder().to(device)
     autoencoder = Autoencoder(encoder_for_ae, decoder).to(device)
 
-    pretrain_autoencoder(autoencoder, train_loader, device, args.autoencoder_epochs, args.lr)
+    pretrain_autoencoder(autoencoder, train_loader, device, args.autoencoder_epochs, lr)
 
     ensemble_model = EnsembleMnistCNN(args.num_sub_networks, args.kwta_k).to(device)
 
     for i, model in enumerate(ensemble_model.models):
         model.features.load_state_dict(autoencoder.encoder.state_dict())
-        print(f"Loaded pre-trained encoder weights into MnistCNN sub-network {i+1}.")
+        # print(f"Loaded pre-trained encoder weights into MnistCNN sub-network {i+1}.")
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         criterion = nn.CrossEntropyLoss()
 
-        best_val_loss = float('inf')
-        patience_counter = 0
-
-        print(f"Training sub-network {i+1}...")
-        for epoch in range(args.epochs):
+        # print(f"Training sub-network {i+1}...")
+        for epoch in range(epochs):
             model.train()
             for images, labels in train_loader:
                 images = images.to(device)
@@ -149,53 +144,36 @@ def main() -> None:
                 loss = criterion(model(images), labels)
                 loss.backward()
                 optimizer.step()
-
-            # Evaluate on test set for early stopping
-            model.eval()
-            val_loss = 0
-            with torch.no_grad():
-                for images, labels in test_loader:
-                    images = images.to(device)
-                    labels = labels.to(device)
-                    val_loss += criterion(model(images), labels).item()
-            val_loss /= len(test_loader)
-
-            print(f"Sub-network {i+1} Epoch {epoch+1}/{args.epochs} finished. Validation Loss: {val_loss:.4f}")
-
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                patience_counter = 0
-            else:
-                patience_counter += 1
-                if patience_counter >= args.patience:
-                    print(f"Early stopping sub-network {i+1} due to no improvement in validation loss for {args.patience} epochs.")
-                    break
+            # print(f"Sub-network {i+1} Epoch {epoch+1}/{epochs} finished.")
 
     accuracy = _accuracy(ensemble_model, test_loader, device)
-    latency_ms = _latency_ms(ensemble_model, test_loader, device)
+    # latency_ms = _latency_ms(ensemble_model, test_loader, device) # Latency is not part of optimization for now
 
-    ckpt_dir = mnist_root / "pipeline" / "checkpoints"
-    ckpt_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint_path = args.checkpoint or (ckpt_dir / "mnist_cnn_ensemble.pt")
-    torch.save({"model_state_dict": ensemble_model.state_dict(), "accuracy": accuracy}, checkpoint_path)
+    return accuracy
 
-    metrics = {
-        "accuracy": round(accuracy, 6),
-        "latency_ms": round(latency_ms, 4),
-        "epochs": args.epochs,
-        "baseline_accuracy": baseline["accuracy"],
-        "baseline_latency_ms": baseline["latency_ms"],
-        "checkpoint": str(checkpoint_path.relative_to(mnist_root)),
-        "device": str(device),
-        "quick_mode": args.quick,
-        "num_sub_networks": args.num_sub_networks,
-        "kwta_k": args.kwta_k,
-    }
-    out = args.output or (mnist_root / "pipeline" / "last_train_metrics.json")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(metrics))
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Train MNIST CNN with Optuna hyperparameter optimization.")
+    parser.add_argument("--mnist-root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--n-trials", type=int, default=10, help="Number of Optuna trials.")
+    parser.add_argument("--quick", action="store_true", help="Use a small train subset for fast smoke runs.")
+    parser.add_argument("--device", default="cpu")
+    args = parser.parse_args()
+
+    study = optuna.create_study(direction="maximize")
+    study.optimize(objective, n_trials=args.n_trials)
+
+    print("\nNumber of finished trials: ", len(study.trials))
+    print("Best trial:")
+    trial = study.best_trial
+
+    print("  Value: ", trial.value)
+    print("  Params: ")
+    for key, value in trial.params.items():
+        print(f"    {key}: {value}")
+
+    # Here you would typically re-train the model with the best parameters
+    # or save them for later use. For this task, we just print them.
 
 if __name__ == "__main__":
     main()

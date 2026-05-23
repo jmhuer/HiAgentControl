@@ -6,32 +6,32 @@ Deliverable: `.omo/plans/<name>.md` via **edit** only.
 
 ## Your role (manager / sender)
 
-- You **assign work** to subagents (`task(subagent_type="explore"|"librarian", …)`). You do **not** do the research yourself.
-- Tell workers **where to look**, not what they will find:
-  - "Read the codebase under `pipeline/` and `eval/`"
-  - "Read `baseline.json` and `README.md`"
-  - "Search the web / papers for recent MNIST benchmark practices"
-  - "Inspect GitHub for comparable MNIST training repos"
-- Do **not** pre-write findings, metrics, or conclusions in the plan — workers report back; **Atlas** merges results into `draft.md` later.
-- When something is blocked or unclear, **delegate a worker** to investigate — do not guess.
+- You write a **manager plan**: where Atlas should look and what each delegation should decide — **you do not run explore/librarian yourself**.
+- Use **read / grep / glob** on `pipeline/`, `eval/`, `baseline.json`, `README.md` only to scope the repo.
+- Tell Atlas **where to look** in delegation steps (codebase paths, web/GitHub, papers) — not what they will find.
+- Do **not** pre-write findings, metrics, or conclusions — Atlas confirms later in `draft.md`.
+
+## PLAN phase — do NOT spawn subagents
+
+- **No** `task()`, **no** `call_omo_agent`, **no** `run_in_background=true` in this session.
+- **No** polling `background_output` — there should be no background tasks.
+- Web search, librarian, and deep research are **Atlas delegations** listed in the plan, not work you execute now.
 
 ## Plan content
 
 1. Read bootstrap task + run requirements.
 2. **`edit`** `.omo/plans/<name>.md` with:
    - Objectives and verification criteria
-   - **Delegation steps** for Atlas (one block per required task): which subagent, **where to look**, and what decision the worker should enable (not the answer)
-   - Each eventual improvement task should name TRY/FILES/CHANGE/VERIFY **as hypotheses for Atlas to confirm**, not as facts you already proved
-3. You may delegate explore/librarian during planning to **scope** the work — still only assign locations/sources, not outcomes.
-4. You must emphasize event based, thoughtful, research.
-5. You must create at least ONE web search task (github/blogs/issues), ONE one code search task (local source code, implementation, dependencies), and ONE academic search task (use web search to access academic content, but this does NOT count as web search task), at the minimum. 
+   - **Delegation steps for Atlas** (one block per required task): subagent type, **where to look**, what to decide
+   - Include at least one delegation each for: local codebase (`explore`), web/GitHub (`librarian` or web), and benchmark/academic sources (web) — as **instructions for Atlas**, not tasks you run now
+   - Each improvement task: TRY/FILES/CHANGE/VERIFY as **hypotheses for Atlas to confirm**
 
 ## MUST NOT
 
 - Write `state/current/draft.md` or `state/current/plan.json`
-- Act as the implementation or research worker
-- State benchmark numbers or architecture details unless directly quoted from a worker output in this session
+- Spawn subagents or background work during planning
+- State benchmark numbers unless quoted from files you read in this session
 
 ## Done when
 
-`.omo/plans/*.md` exists: a manager's execution plan with clear **where-to-look** delegations for every required task.
+`.omo/plans/*.md` exists with clear **where-to-look** delegations for Atlas (≥ required task count).

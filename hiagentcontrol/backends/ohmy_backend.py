@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import socket
 import subprocess
 import threading
@@ -17,10 +18,22 @@ def _log(msg: str) -> None:
 
 
 def default_ohmy_bin() -> str:
-    return os.getenv(
-        "HAC_OHMY_BIN",
-        "/tmp/bunx-1000-oh-my-openagent@latest/node_modules/oh-my-openagent-linux-x64/bin/oh-my-opencode",
-    )
+    """
+    Resolve the oh-my-openagent CLI (headless OpenCode + plugin launcher).
+
+    Order: HAC_OHMY_BIN → oh-my-openagent on PATH → oh-my-opencode on PATH
+    → bunx oh-my-openagent@latest (single fallback).
+    """
+    override = os.getenv("HAC_OHMY_BIN")
+    if override:
+        return override
+
+    for name in ("oh-my-openagent", "oh-my-opencode"):
+        found = shutil.which(name)
+        if found:
+            return found
+
+    return "bunx oh-my-openagent@latest"
 
 
 @dataclass(frozen=True)
@@ -34,7 +47,7 @@ class OhMyRunResult:
 
 class OhMyBackend:
     """
-    Thin wrapper around `oh-my-opencode run`.
+    Thin wrapper around `oh-my-openagent run` (or `oh-my-opencode run`).
 
     OMO waits until todos and background child sessions are idle before exiting.
     Python only invokes and checks deliverables on disk.
@@ -47,11 +60,13 @@ class OhMyBackend:
         binary_path: str | None = None,
         base_port: int = 4205,
         timeout_sec: int = 1800,
+        on_complete: str | None = None,
     ) -> None:
         self.root = root.resolve()
         self.binary_path = binary_path or default_ohmy_bin()
         self.base_port = base_port
         self.timeout_sec = timeout_sec
+        self.on_complete = on_complete
 
     def run(
         self,
@@ -60,17 +75,37 @@ class OhMyBackend:
         prompt: str,
         port_offset: int = 0,
         agent: str | None = None,
+        on_complete: str | None = None,
     ) -> OhMyRunResult:
         selected_port = _pick_available_port(self.base_port + port_offset)
-        cmd = [
-            self.binary_path,
-            "run",
-            "--directory",
-            str(workdir.resolve()),
-            "--port",
-            str(selected_port),
-            "--json",
-        ]
+        binary = self.binary_path
+        use_bunx = binary.startswith("bunx ")
+
+        cmd: list[str]
+        if use_bunx:
+            cmd = binary.split() + [
+                "run",
+                "--directory",
+                str(workdir.resolve()),
+                "--port",
+                str(selected_port),
+                "--json",
+            ]
+        else:
+            cmd = [
+                binary,
+                "run",
+                "--directory",
+                str(workdir.resolve()),
+                "--port",
+                str(selected_port),
+                "--json",
+            ]
+
+        hook = on_complete or self.on_complete
+        if hook:
+            cmd.extend(["--on-complete", hook])
+
         if agent:
             cmd.extend(["--agent", agent])
         cmd.append(prompt)
@@ -80,9 +115,10 @@ class OhMyBackend:
 
         agent_label = f"  agent={agent}" if agent else ""
         _log(
-            f"oh-my-opencode run  port={selected_port}  workdir={workdir.name}  "
+            f"oh-my-openagent run  port={selected_port}  workdir={workdir.name}  "
             f"timeout={self.timeout_sec}s{agent_label}"
         )
+        _log(f"  binary: {binary}")
         _log(f"  live log: tail -f {log_path}")
         _log(f"  prompt[:120]: {prompt[:120].replace(chr(10), ' ')}")
 
@@ -96,6 +132,7 @@ class OhMyBackend:
                     fh.flush()
                     stdout_lines.append(line)
 
+        proc: subprocess.Popen | None = None
         try:
             proc = subprocess.Popen(
                 cmd,
@@ -110,13 +147,15 @@ class OhMyBackend:
             proc.wait(timeout=self.timeout_sec)
             reader.join(timeout=10)
         except subprocess.TimeoutExpired:
-            _log(f"  [TIMEOUT] oh-my-opencode did not finish within {self.timeout_sec}s — killing")
-            proc.kill()
-            reader.join(timeout=5)
+            _log(f"  [TIMEOUT] oh-my-openagent did not finish within {self.timeout_sec}s — killing")
+            if proc is not None:
+                proc.kill()
+                reader.join(timeout=5)
             raise
 
+        assert proc is not None
         stdout_text = "".join(stdout_lines)
-        _log(f"  oh-my-opencode done  rc={proc.returncode}  lines={len(stdout_lines)}")
+        _log(f"  oh-my-openagent done  rc={proc.returncode}  lines={len(stdout_lines)}")
         parsed = _parse_run_output(stdout_text)
         return OhMyRunResult(
             returncode=proc.returncode,

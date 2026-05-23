@@ -11,7 +11,7 @@
     "glob": { "*": "allow" },
     "grep": { "*": "allow" },
     "edit": "allow",
-    "bash": "deny",
+    "bash": "allow",
     "webfetch": "allow",
     "websearch": "allow",
     "codesearch": "allow"

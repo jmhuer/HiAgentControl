@@ -12,22 +12,25 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
+from sklearn.metrics import precision_recall_fscore_support, confusion_matrix
 
 # Import from sibling pipeline package path when run as script.
 _PIPELINE = Path(__file__).resolve().parents[1] / "pipeline"
 if str(_PIPELINE) not in sys.path:
     sys.path.insert(0, str(_PIPELINE))
-from model import MnistCNN  # noqa: E402
+from model import MnistCNN, EnsembleMnistCNN  # noqa: E402
 
 
 def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _accuracy(model: torch.nn.Module, loader: DataLoader, device: torch.device) -> float:
+def _accuracy(model: torch.nn.Module, loader: DataLoader, device: torch.device) -> tuple[float, torch.Tensor, torch.Tensor]:
     model.eval()
     correct = 0
     total = 0
+    all_preds = []
+    all_labels = []
     with torch.no_grad():
         for images, labels in loader:
             images = images.to(device)
@@ -35,7 +38,16 @@ def _accuracy(model: torch.nn.Module, loader: DataLoader, device: torch.device) 
             preds = model(images).argmax(dim=1)
             correct += (preds == labels).sum().item()
             total += labels.size(0)
-    return correct / max(total, 1)
+            all_preds.append(preds)
+            all_labels.append(labels)
+    return correct / max(total, 1), torch.cat(all_preds), torch.cat(all_labels)
+
+def _precision_recall_f1(labels: torch.Tensor, preds: torch.Tensor) -> dict:
+    precision, recall, f1, _ = precision_recall_fscore_support(labels.cpu().numpy(), preds.cpu().numpy(), average='macro', zero_division=0)
+    return {"precision": precision, "recall": recall, "f1_score": f1}
+
+def _confusion_matrix(labels: torch.Tensor, preds: torch.Tensor) -> list[list[int]]:
+    return confusion_matrix(labels.cpu().numpy(), preds.cpu().numpy()).tolist()
 
 
 def _latency_ms(model: torch.nn.Module, loader: DataLoader, device: torch.device, samples: int = 256) -> float:
@@ -72,7 +84,7 @@ def main() -> int:
     metrics_path = args.metrics or (mnist_root / "pipeline" / "last_train_metrics.json")
     train_metrics = _load_json(metrics_path) if metrics_path.exists() else {}
 
-    checkpoint_path = args.checkpoint or (mnist_root / train_metrics.get("checkpoint", "pipeline/checkpoints/mnist_cnn.pt"))
+    checkpoint_path = args.checkpoint or (mnist_root / train_metrics.get("checkpoint", "pipeline/checkpoints/mnist_cnn_ensemble.pt"))
     if not Path(checkpoint_path).is_absolute():
         checkpoint_path = mnist_root / checkpoint_path
     if not checkpoint_path.exists():
@@ -87,12 +99,17 @@ def main() -> int:
         test_set = Subset(test_set, range(1000))
     test_loader = DataLoader(test_set, batch_size=128, shuffle=False, num_workers=0)
 
-    model = MnistCNN().to(device)
+    num_sub_networks = train_metrics.get("num_sub_networks", 3)
+    kwta_k = train_metrics.get("kwta_k", 1)
+
+    model = EnsembleMnistCNN(num_sub_networks, kwta_k).to(device)
     payload = torch.load(checkpoint_path, map_location=device, weights_only=True)
     model.load_state_dict(payload["model_state_dict"])
 
-    accuracy = _accuracy(model, test_loader, device)
+    accuracy, all_preds, all_labels = _accuracy(model, test_loader, device)
     latency_ms = _latency_ms(model, test_loader, device)
+    pr_f1_metrics = _precision_recall_f1(all_labels, all_preds)
+    conf_matrix = _confusion_matrix(all_labels, all_preds)
 
     acc_ok = accuracy >= float(baseline["accuracy"])
     lat_ok = latency_ms <= float(baseline["latency_ms"])
@@ -101,6 +118,10 @@ def main() -> int:
         "passed": passed,
         "accuracy": round(accuracy, 6),
         "latency_ms": round(latency_ms, 4),
+        "precision": round(pr_f1_metrics["precision"], 6),
+        "recall": round(pr_f1_metrics["recall"], 6),
+        "f1_score": round(pr_f1_metrics["f1_score"], 6),
+        "confusion_matrix": conf_matrix,
         "accuracy_ok": acc_ok,
         "latency_ok": lat_ok,
         "baseline": baseline,
