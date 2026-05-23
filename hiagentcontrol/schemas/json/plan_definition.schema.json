@@ -1,0 +1,278 @@
+{
+  "$defs": {
+    "AiEvalCheck": {
+      "description": "Optional AI review after deterministic checks.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "rubric": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rubric",
+          "type": "array"
+        },
+        "model_hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Hint"
+        }
+      },
+      "title": "AiEvalCheck",
+      "type": "object"
+    },
+    "ContextRef": {
+      "description": "Context references for grounded work and traceability.",
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "ContextRef",
+      "type": "object"
+    },
+    "GateDefinition": {
+      "description": "Optional gate contract.\n\nA gate may be empty (no deterministic check and no AI evaluation)\nwhen a task intentionally relies on supervisor judgment.",
+      "properties": {
+        "script_checks": {
+          "items": {
+            "$ref": "#/$defs/ScriptCheck"
+          },
+          "title": "Script Checks",
+          "type": "array"
+        },
+        "ai_eval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AiEvalCheck"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "GateDefinition",
+      "type": "object"
+    },
+    "GoalType": {
+      "description": "Canonical goal types for task instances.",
+      "enum": [
+        "feature",
+        "ablation_study",
+        "architecture",
+        "hygiene",
+        "survey"
+      ],
+      "title": "GoalType",
+      "type": "string"
+    },
+    "PlanMetadata": {
+      "description": "Top-level metadata for a plan artifact.",
+      "properties": {
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "objective": {
+          "minLength": 1,
+          "title": "Objective",
+          "type": "string"
+        },
+        "workdir": {
+          "minLength": 1,
+          "title": "Workdir",
+          "type": "string"
+        },
+        "source_draft_path": {
+          "minLength": 1,
+          "title": "Source Draft Path",
+          "type": "string"
+        },
+        "loop_attempt": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Loop Attempt",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "title",
+        "objective",
+        "workdir",
+        "source_draft_path"
+      ],
+      "title": "PlanMetadata",
+      "type": "object"
+    },
+    "ScriptCheck": {
+      "description": "Deterministic executable check.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "script",
+            "test",
+            "metric"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "args": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Args",
+          "type": "array"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "path"
+      ],
+      "title": "ScriptCheck",
+      "type": "object"
+    },
+    "TaskDefinition": {
+      "description": "Generic task instance used by plan and execution workflows.",
+      "properties": {
+        "task": {
+          "minLength": 1,
+          "title": "Task",
+          "type": "string"
+        },
+        "goal_type": {
+          "$ref": "#/$defs/GoalType"
+        },
+        "scope": {
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        },
+        "required_skills": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Skills",
+          "type": "array"
+        },
+        "required_tools": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Tools",
+          "type": "array"
+        },
+        "gate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GateDefinition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "must_not_do": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Must Not Do",
+          "type": "array"
+        },
+        "context": {
+          "items": {
+            "$ref": "#/$defs/ContextRef"
+          },
+          "title": "Context",
+          "type": "array"
+        }
+      },
+      "required": [
+        "task",
+        "goal_type",
+        "scope"
+      ],
+      "title": "TaskDefinition",
+      "type": "object"
+    }
+  },
+  "description": "Structured output for a plan instance.",
+  "properties": {
+    "plan_id": {
+      "minLength": 1,
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "#/$defs/PlanMetadata"
+    },
+    "tasks": {
+      "items": {
+        "$ref": "#/$defs/TaskDefinition"
+      },
+      "minItems": 1,
+      "title": "Tasks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "plan_id",
+    "metadata",
+    "tasks"
+  ],
+  "title": "PlanDefinition",
+  "type": "object"
+}

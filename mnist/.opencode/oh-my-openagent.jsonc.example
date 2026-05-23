@@ -1,0 +1,72 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "ralph_loop": {
+    "enabled": true
+  },
+  "experimental": {
+    "task_system": true
+  },
+  "disabled_mcps": ["ast_grep"],
+  "agents": {
+    "sisyphus": {
+      "model": "openrouter/google/gemini-2.0-flash-001",
+      "maxTokens": 8192,
+      "permission": {
+        "external_directory": "deny",
+        "task": "allow",
+        "edit": "allow"
+      }
+    },
+    "prometheus": {
+      "model": "openrouter/google/gemini-2.0-flash-001",
+      "maxTokens": 8192,
+      "permission": {
+        "external_directory": "deny",
+        "task": "allow",
+        "edit": "allow"
+      },
+      "prompt_append": "Manager only: delegate explore/librarian with WHERE to look (codebase, baseline.json, web/GitHub) — never pre-write findings. Use edit for .omo/plans/*.md only. Spawn workers when blocked."
+    },
+    "atlas": {
+      "model": "openrouter/anthropic/claude-3.5-haiku",
+      "maxTokens": 8192,
+      "permission": {
+        "external_directory": "deny",
+        "task": "allow",
+        "edit": "allow"
+      },
+      "prompt_append": "You execute Prometheus delegations: run explore/librarian, then edit state/current/draft.md with confirmed findings. Manager said where to look; you report what was found."
+    },
+    "hephaestus": {
+      "model": "openrouter/openai/gpt-4o-mini",
+      "maxTokens": 8192,
+      "permission": {
+        "external_directory": "deny",
+        "task": "allow",
+        "edit": "allow"
+      }
+    },
+    "oracle": {
+      "model": "openrouter/openai/gpt-4o-mini",
+      "maxTokens": 4096
+    },
+    "librarian": {
+      "model": "openrouter/openai/gpt-4o-mini",
+      "maxTokens": 4096,
+      "permission": {
+        "edit": "deny",
+        "bash": "deny",
+        "external_directory": "deny"
+      }
+    },
+    "explore": {
+      "model": "openrouter/openai/gpt-4o-mini",
+      "maxTokens": 4096,
+      "permission": {
+        "edit": "deny",
+        "bash": "deny",
+        "external_directory": "deny"
+      }
+    }
+  }
+}

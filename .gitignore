@@ -1,0 +1,37 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Archives and debug dumps
+*.zip
+trasncript.json
+
+# Datasets and downloads — any data/ folder in the repo
+**/data/
+data/
+
+# Agent session state
+.omo/
+mnist/.omo/
+mnist/state/
+mnist/.pytest_cache/
+
+# Per-machine OMO overrides (copy from .example)
+mnist/.opencode/oh-my-openagent.jsonc
+
+# opencode runtime (not config)
+.opencode/node_modules/
+.opencode/package.json
+.opencode/package-lock.json
+.opencode-runtime-*/
+mnist/.opencode/node_modules/
+
+# Training artifacts
+mnist/pipeline/checkpoints/
+mnist/pipeline/last_train_metrics.json
+
+# Credentials (keep templates)
+credentials/*
+!credentials/README.md
+!credentials/*.example

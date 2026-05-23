@@ -1,0 +1,61 @@
+{
+  "task": "Create a deeply researched MNIST improvement plan and output a valid plan JSON artifact.",
+  "goal_type": "survey",
+  "scope": "Survey current mnist pipeline/eval, inspect recent benchmark practices, and define a sequence of candidate improvement tasks with objective gates.",
+  "required_skills": [],
+  "required_tools": [
+    "read",
+    "glob",
+    "grep",
+    "call_omo_agent",
+    "task",
+    "edit",
+    "webfetch",
+    "websearch"
+  ],
+  "gate": {
+    "script_checks": [],
+    "ai_eval": {
+      "enabled": true,
+      "rubric": [
+        "Research depth and source grounding are sufficient.",
+        "Task ordering is coherent and additive.",
+        "Each task has truthful verification criteria."
+      ]
+    }
+  },
+  "must_not_do": [
+    "Prometheus must not write state/current/draft.md directly — delegate Atlas to produce the draft.",
+    "Do not run /init-deep, skill(init-deep), or create AGENTS.md files.",
+    "Do not pass fictional load_skills names; use only installed OMO skills or [].",
+    "Do not invent benchmark claims without traceable context.",
+    "Do not emit freeform output as final deliverable; output must be valid JSON plan.",
+    "Do not edit files outside state/ (executors) or .omo/plans/ (planner)."
+  ],
+  "context": [
+    {
+      "path": ".omo/plans/",
+      "note": "Prometheus writes the execution plan here (what to research)."
+    },
+    {
+      "path": "mnist/README.md",
+      "note": "Current project conventions and baseline context."
+    },
+    {
+      "path": "mnist/pipeline/",
+      "note": "Code path for train/inference implementation."
+    },
+    {
+      "path": "mnist/eval/",
+      "note": "Deterministic evaluation path and baseline checks."
+    },
+    {
+      "path": "state/current/draft.md",
+      "note": "Executor deliverable: researched content before JSON structuring."
+    },
+    {
+      "path": "state/current/plan.json",
+      "note": "Final structured deliverable after structure phase."
+    }
+  ]
+}

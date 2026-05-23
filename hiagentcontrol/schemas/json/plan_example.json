@@ -1,0 +1,58 @@
+{
+  "plan_id": "mnist-improvement-v1",
+  "metadata": {
+    "title": "MNIST Improvement Plan",
+    "objective": "Improve MNIST accuracy above baseline without exceeding latency budget.",
+    "workdir": "mnist",
+    "source_draft_path": "state/current/draft.md",
+    "loop_attempt": 0
+  },
+  "tasks": [
+    {
+      "task": "Add rotation and affine augmentation to training transforms",
+      "goal_type": "feature",
+      "scope": "TRY: Train with RandomRotation(10) and RandomAffine(degrees=10, translate=(0.1,0.1)) on MNIST train split. FILES: pipeline/train.py. CHANGE: Add transforms after ToTensor in the existing Compose; keep Normalize unchanged. VERIFY: python eval/run_eval.py --quick with accuracy >= 0.990 and latency_ms <= 13.0.",
+      "required_skills": [],
+      "required_tools": ["read", "edit", "bash"],
+      "gate": {
+        "script_checks": [
+          {
+            "kind": "script",
+            "name": "eval-gate",
+            "path": "python",
+            "args": ["eval/run_eval.py", "--quick"],
+            "threshold": "accuracy >= 0.990 and latency_ms <= 13.0"
+          }
+        ],
+        "ai_eval": null
+      },
+      "must_not_do": ["Do not change eval/run_eval.py gate logic."],
+      "context": [
+        {"path": "pipeline/train.py", "note": "transforms.Compose"},
+        {"path": "eval/run_eval.py", "note": "Verification"},
+        {"path": "baseline.json", "note": "Baseline metrics"}
+      ]
+    },
+    {
+      "task": "Add CosineAnnealingLR scheduler to Adam training",
+      "goal_type": "feature",
+      "scope": "TRY: Retrain MnistCNN for 3 epochs with CosineAnnealingLR(T_max=epochs). FILES: pipeline/train.py. CHANGE: Instantiate scheduler after optimizer; call scheduler.step() each epoch. VERIFY: python eval/run_eval.py --quick with accuracy >= 0.992 and latency_ms <= 13.0.",
+      "required_skills": [],
+      "required_tools": ["read", "edit", "bash"],
+      "gate": {
+        "script_checks": [
+          {
+            "kind": "script",
+            "name": "eval-gate",
+            "path": "python",
+            "args": ["eval/run_eval.py", "--quick"],
+            "threshold": "accuracy >= 0.992 and latency_ms <= 13.0"
+          }
+        ],
+        "ai_eval": null
+      },
+      "must_not_do": [],
+      "context": [{"path": "pipeline/train.py", "note": "Optimizer loop"}]
+    }
+  ]
+}
