@@ -130,6 +130,18 @@ def test_run_gate_fails_wrong_count(tmp_path: Path, capsys) -> None:
     assert "rework_phase: format" in rework
 
 
+def test_run_gate_missing_plan_routes_to_format_if_draft_exists(tmp_path: Path) -> None:
+    workdir = tmp_path / "mnist"
+    state = workdir / "state/current"
+    state.mkdir(parents=True)
+    (state / "draft.md").write_text("# draft\n", encoding="utf-8")
+
+    passed, _ = run_gate(workdir=workdir, num_tasks=2)
+    assert not passed
+    rework = (state / "targeted_rework.md").read_text(encoding="utf-8")
+    assert "rework_phase: format" in rework
+
+
 def test_write_targeted_rework_includes_phase(tmp_path: Path) -> None:
     outcome = GlobalEvaluationNode().evaluate(
         workdir=tmp_path,

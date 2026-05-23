@@ -81,6 +81,13 @@ def run_gate(
     )
     report = from_outcome(outcome)
     phase = choose_rework_phase(report=report)
+    # If plan.json is missing but draft exists, formatter can often recover
+    # without forcing full PI replanning.
+    failed = {c.name for c in report.checks if not c.passed}
+    if "plan-json-exists" in failed:
+        draft_path = workdir / "state/current/draft.md"
+        if draft_path.is_file():
+            phase = ReworkPhase.FORMAT
 
     state_dir = workdir / "state/current"
     state_dir.mkdir(parents=True, exist_ok=True)
