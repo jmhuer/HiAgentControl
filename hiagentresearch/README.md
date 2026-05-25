@@ -29,17 +29,22 @@ This directory contains the first implementation of the branch-based research ru
 ## Quick start (local)
 
 ```bash
+export CURSOR_API_KEY="cursor_..."
 PYTHONPATH=. python -m hiagentresearch.src.orchestrator init
 PYTHONPATH=. python -m hiagentresearch.src.orchestrator run-group --group-id model_architecture --workdir mnist --quick
 ```
 
-Optional: run one real agent command before evaluation and capture full stdout/stderr:
+By default `run-group` uses a real Cursor SDK agent backend.  
+If you need command-mode fallback while debugging, set `--agent-backend command --agent-command "..."`
+
+Optional explicit backend flags:
 
 ```bash
 PYTHONPATH=. python -m hiagentresearch.src.orchestrator run-group \
   --group-id model_architecture \
   --workdir . \
-  --agent-command "echo phase1-agent-step"
+  --agent-backend cursor_sdk \
+  --agent-model composer-2.5
 ```
 
 The run command writes visibility artifacts under:

@@ -11,6 +11,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from hiagentresearch.src.agent_backends import AgentBackendError, run_cursor_agent_cycle
 from hiagentresearch.src.artifact_schema import (
     ArtifactParseError,
     classify_non_json_failure,
@@ -94,6 +95,8 @@ def run_group(
     workdir: Path,
     quick: bool,
     evidence_path: Path | None,
+    agent_backend: str,
+    agent_model: str,
     agent_command: str | None,
     agent_timeout_sec: int,
 ) -> int:
@@ -131,8 +134,65 @@ def run_group(
         },
     )
 
-    if agent_command:
-        _append_jsonl(actions_path, {"step": "run_agent_command", "command": agent_command})
+    prior_intent = registry.read_intent_packet(group.id) or _seed_intent(group)
+    if agent_backend == "cursor_sdk":
+        _append_jsonl(actions_path, {"step": "run_agent_backend", "backend": "cursor_sdk", "model": agent_model})
+        try:
+            record = run_cursor_agent_cycle(
+                workdir=workdir,
+                run_dir=run_dir,
+                group=group,
+                intent_packet=prior_intent,
+                run_id=run_id,
+                model=agent_model,
+            )
+            (run_dir / "agent_stdout.txt").write_text(record.summary, encoding="utf-8")
+            (run_dir / "agent_stderr.txt").write_text("", encoding="utf-8")
+        except AgentBackendError as exc:
+            _write_json(
+                metadata_path,
+                {
+                    "run_id": run_id,
+                    "group": asdict(group),
+                    "status": "error",
+                    "failure_class": "invalid_cycle",
+                    "error": str(exc),
+                    "agent_backend": "cursor_sdk",
+                },
+            )
+            registry.record_run(
+                run_id=run_id,
+                group_id=group.id,
+                branch=group.branch,
+                status="error",
+                failure_class="invalid_cycle",
+                metrics={},
+            )
+            registry.record_transition(
+                TransitionEvent(
+                    run_id=run_id,
+                    group_id=group.id,
+                    from_state="running_agent_cycle",
+                    to_state="blocked",
+                    reason="cursor_agent_backend_failed",
+                    actor="orchestrator",
+                )
+            )
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "run_id": run_id,
+                        "status": "error",
+                        "failure_class": "invalid_cycle",
+                        "run_dir": str(run_dir.relative_to(ROOT.parent)),
+                    },
+                    indent=2,
+                )
+            )
+            return 1
+    elif agent_command:
+        _append_jsonl(actions_path, {"step": "run_agent_backend", "backend": "command", "command": agent_command})
         agent_proc = subprocess.run(
             _normalize_python_command(agent_command),
             cwd=workdir,
@@ -261,7 +321,7 @@ def run_group(
         metrics=metrics,
     )
 
-    prior = registry.read_intent_packet(group.id) or _seed_intent(group)
+    prior = prior_intent
     if failure_class != "infra_failure":
         prior.attempt_count += 1
     prior.last_failure_class = failure_class if failure_class != "none" else "none"
@@ -320,6 +380,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--workdir", default=".")
     run.add_argument("--quick", action="store_true")
     run.add_argument("--evidence-json", type=Path, default=None)
+    run.add_argument("--agent-backend", choices=["cursor_sdk", "command", "none"], default="cursor_sdk")
+    run.add_argument("--agent-model", default="composer-2.5")
     run.add_argument("--agent-command", default=None, help="Optional command that runs the group agent loop once.")
     run.add_argument("--agent-timeout-sec", type=int, default=900)
     return parser
@@ -336,6 +398,8 @@ def main(argv: list[str] | None = None) -> int:
             workdir=Path(args.workdir).resolve(),
             quick=args.quick,
             evidence_path=args.evidence_json,
+            agent_backend=args.agent_backend,
+            agent_model=args.agent_model,
             agent_command=args.agent_command,
             agent_timeout_sec=args.agent_timeout_sec,
         )
