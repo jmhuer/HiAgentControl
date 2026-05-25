@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import shlex
 import subprocess
@@ -139,6 +140,12 @@ def run_group(
             text=True,
             check=False,
             timeout=agent_timeout_sec,
+            env={
+                **os.environ,
+                "HIAGENTRESEARCH_RUN_ID": run_id,
+                "HIAGENTRESEARCH_GROUP_ID": group.id,
+                "HIAGENTRESEARCH_STATE_DIR": str(STATE_DIR.resolve()),
+            },
         )
         (run_dir / "agent_stdout.txt").write_text(agent_proc.stdout, encoding="utf-8")
         (run_dir / "agent_stderr.txt").write_text(agent_proc.stderr, encoding="utf-8")

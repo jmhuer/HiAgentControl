@@ -9,6 +9,7 @@ groups:
       - mnist/pipeline/model.py
       - mnist/pipeline/train.py
       - mnist/eval/run_eval.py
+      - mnist/pipeline/research_markers.py
     evaluation:
       command: python mnist/eval/run_phase1_eval.py --mnist-root mnist --quick
       parser: mnist_phase1_json_stdout
