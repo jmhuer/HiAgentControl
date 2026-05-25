@@ -10,6 +10,7 @@ This script is intentionally lightweight and deterministic:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import subprocess
@@ -67,6 +68,7 @@ def main() -> int:
         "selected_tests": selected_tests,
         "pytest_exit_code": proc.returncode,
         "baseline": baseline,
+        "latest_hypothesis": _load_latest_hypothesis(root / "pipeline" / "research_hypotheses.py"),
     }
     print(json.dumps(report, indent=2))
     if proc.stdout:
@@ -76,6 +78,20 @@ def main() -> int:
         print("\n--- pytest stderr ---", file=sys.stderr)
         print(proc.stderr.rstrip(), file=sys.stderr)
     return 0 if passed else 2
+
+
+def _load_latest_hypothesis(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    spec = importlib.util.spec_from_file_location("research_hypotheses", path)
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    hypotheses = getattr(module, "HYPOTHESES", [])
+    if hypotheses:
+        return hypotheses[0]
+    return None
 
 
 if __name__ == "__main__":

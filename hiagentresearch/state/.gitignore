@@ -2,3 +2,5 @@ runs/
 intent_packets/
 events.jsonl
 evals.db
+agent_activity/
+github_runs/

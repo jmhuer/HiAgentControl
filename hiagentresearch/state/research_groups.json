@@ -10,7 +10,9 @@
       "allowed_paths": [
         "mnist/pipeline/model.py",
         "mnist/pipeline/train.py",
-        "mnist/eval/run_eval.py"
+        "mnist/eval/run_eval.py",
+        "mnist/pipeline/research_markers.py",
+        "mnist/pipeline/research_hypotheses.py"
       ],
       "evaluation": {
         "command": "python mnist/eval/run_phase1_eval.py --mnist-root mnist --quick",
