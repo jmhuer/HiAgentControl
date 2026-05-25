@@ -18,6 +18,11 @@ cd "$ROOT"
 export PYTHONPATH="$ROOT"
 git checkout "$BRANCH"
 
+if [[ -z "${CURSOR_API_KEY:-}" ]]; then
+  echo "CURSOR_API_KEY is required for real cursor-agent loops." >&2
+  exit 1
+fi
+
 "$PYTHON" -m hiagentresearch.src.orchestrator init
 
 for i in $(seq 1 "$LOOPS"); do
@@ -27,7 +32,8 @@ for i in $(seq 1 "$LOOPS"); do
     --workdir "$WORKDIR" \
     --quick \
     --evidence-json "$EVIDENCE_JSON" \
-    --agent-command "python -m hiagentresearch.src.mock_group_agent --group-id ${GROUP_ID}")"
+    --agent-backend cursor_sdk \
+    --agent-model composer-2.5)"
   echo "$out"
   run_id="$("$PYTHON" - <<'PY' "$out"
 import re, sys
