@@ -128,48 +128,48 @@ def main() -> None:
     pretrain_autoencoder(autoencoder, train_loader, device, args.autoencoder_epochs, args.lr)
 
     ensemble_model = EnsembleMnistCNN(args.num_sub_networks, args.kwta_k).to(device)
+    ensemble_model.load_encoder_weights(autoencoder.encoder.state_dict())
+    print("Loaded pre-trained encoder weights into shared trunk.")
 
-    for i, model in enumerate(ensemble_model.models):
-        model.features.load_state_dict(autoencoder.encoder.state_dict())
-        print(f"Loaded pre-trained encoder weights into MnistCNN sub-network {i+1}.")
+    optimizer = torch.optim.Adam(ensemble_model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    criterion = nn.CrossEntropyLoss()
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-        criterion = nn.CrossEntropyLoss()
+    best_val_loss = float("inf")
+    patience_counter = 0
 
-        best_val_loss = float('inf')
-        patience_counter = 0
+    print("Training shared-trunk ensemble...")
+    for epoch in range(args.epochs):
+        ensemble_model.train()
+        for images, labels in train_loader:
+            images = images.to(device)
+            labels = labels.to(device)
+            optimizer.zero_grad()
+            loss = criterion(ensemble_model(images), labels)
+            loss.backward()
+            optimizer.step()
 
-        print(f"Training sub-network {i+1}...")
-        for epoch in range(args.epochs):
-            model.train()
-            for images, labels in train_loader:
+        ensemble_model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for images, labels in test_loader:
                 images = images.to(device)
                 labels = labels.to(device)
-                optimizer.zero_grad()
-                loss = criterion(model(images), labels)
-                loss.backward()
-                optimizer.step()
+                val_loss += criterion(ensemble_model(images), labels).item()
+        val_loss /= len(test_loader)
 
-            # Evaluate on test set for early stopping
-            model.eval()
-            val_loss = 0
-            with torch.no_grad():
-                for images, labels in test_loader:
-                    images = images.to(device)
-                    labels = labels.to(device)
-                    val_loss += criterion(model(images), labels).item()
-            val_loss /= len(test_loader)
+        print(f"Ensemble Epoch {epoch + 1}/{args.epochs} finished. Validation Loss: {val_loss:.4f}")
 
-            print(f"Sub-network {i+1} Epoch {epoch+1}/{args.epochs} finished. Validation Loss: {val_loss:.4f}")
-
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                patience_counter = 0
-            else:
-                patience_counter += 1
-                if patience_counter >= args.patience:
-                    print(f"Early stopping sub-network {i+1} due to no improvement in validation loss for {args.patience} epochs.")
-                    break
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= args.patience:
+                print(
+                    f"Early stopping ensemble due to no improvement in validation loss "
+                    f"for {args.patience} epochs."
+                )
+                break
 
     accuracy = _accuracy(ensemble_model, test_loader, device)
     latency_ms = _latency_ms(ensemble_model, test_loader, device)

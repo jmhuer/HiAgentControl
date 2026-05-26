@@ -7,6 +7,47 @@ from __future__ import annotations
 
 RESEARCH_HYPOTHESES: list[dict] = [
     {
+        "hypothesis_id": "model_architecture-h5",
+        "theme": "shared_trunk_ensemble",
+        "hypothesis": (
+            "h4 moved layer3/layer4 to ReLU but train.py still defaults to num_sub_networks=3 "
+            "with EnsembleMnistCNN stacking three full ResNet18 forwards per sample "
+            "(train_optuna.py: torch.stack([model(x) for model in self.models])). "
+            "baseline.json requires latency_ms <= 13.0 at accuracy >= 0.985. Splitting ResNet "
+            "into one ResNetTrunk (conv1 through layer3, 256x7x7) plus three ResNetHead "
+            "branches (layer4 + pool + linear) runs the heavy backbone once while preserving "
+            "top-k logit voting. Expected: ~35-50% latency drop vs three full forwards with "
+            "accuracy >= 0.985."
+        ),
+        "planned_change": (
+            "In mnist/pipeline/model.py: add ResNetTrunk, ResNetHead, MnistEncoder, and "
+            "EnsembleMnistCNN with shared trunk; in train.py load encoder into trunk once "
+            "and train the full ensemble jointly."
+        ),
+        "run_id": "run_266dfb842c28",
+        "timestamp": "2026-05-26T00:28:23.884355+00:00",
+    },
+    {
+        "hypothesis_id": "model_architecture-h4",
+        "theme": "late_stage_relu_activation",
+        "hypothesis": (
+            "ResNet18 in model.py applies KWTA(k=10) 17 times per forward (stem plus two "
+            "per BasicBlock across [2,2,2,2]); kwta.py uses torch.topk on the full tensor. "
+            "With train.py num_sub_networks=3, ensemble inference runs ~51 topk passes per "
+            "sample. Layer3/layer4 blocks operate at 7x7 with 256/512 channels—replacing "
+            "their KWTA with ReLU removes 8 of 17 topk calls per sub-network while keeping "
+            "KWTA in stem/layer1/layer2 for early sparsity. Expected: latency_ms moves toward "
+            "baseline.json (<= 13.0) with accuracy >= 0.985."
+        ),
+        "planned_change": (
+            "In mnist/pipeline/model.py: add activation parameter to BasicBlock/ResNet "
+            "_make_layer; default layer3/layer4 to ReLU, keep KWTA in stem/layer1/layer2; "
+            "retrain ensemble and re-measure latency_ms."
+        ),
+        "run_id": "run_e61a448a7e8a",
+        "timestamp": "2026-05-26T00:26:03.344226+00:00",
+    },
+    {
         "hypothesis_id": "model_architecture-h3",
         "theme": "block_kwta_activation_cost",
         "hypothesis": (
