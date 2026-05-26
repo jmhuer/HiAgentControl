@@ -7,6 +7,31 @@ from __future__ import annotations
 
 RESEARCH_HYPOTHESES: list[dict] = [
     {
+        "hypothesis_id": "model_architecture-h3",
+        "theme": "block_kwta_activation_cost",
+        "hypothesis": (
+            "Each MnistCNN ResNet18 forward applies KWTA(k=10) 17 times per sub-network "
+            "(stem conv plus two KWTA calls in every BasicBlock across [2,2,2,2] stages "
+            "in model.py); kWTA.forward runs torch.topk over the full activation tensor "
+            "(mnist/pipeline/kwta.py). With train.py defaults num_sub_networks=3, ensemble "
+            "inference executes ~51 topk passes per sample via the Python loop in "
+            "train_optuna.py EnsembleMnistCNN.forward. Early maps are largest (layer1: "
+            "64x28x28 = 50,176 elements), so KWTA dominates conv FLOPs on CPU and pushes "
+            "latency_ms past baseline.json (<= 13.0). Replacing KWTA with ReLU in layer3 "
+            "and layer4 blocks while keeping KWTA in stem/layer1/layer2 should preserve "
+            "sparsity where it matters and recover enough ms/sample to hold accuracy >= "
+            "0.985 under the latency gate without shrinking the 3-member ensemble."
+        ),
+        "planned_change": (
+            "In mnist/pipeline/model.py: parameterize BasicBlock/ResNet with per-stage "
+            "activation (KWTA vs ReLU); default layer3/layer4 blocks to ReLU, keep KWTA "
+            "in stem/layer1/layer2; retrain EnsembleMnistCNN (num_sub_networks=3) and "
+            "re-measure latency_ms via mnist/pipeline/train.py."
+        ),
+        "run_id": "run_ffbe92342ffe",
+        "timestamp": "2026-05-26T00:21:08.103783+00:00",
+    },
+    {
         "hypothesis_id": "model_architecture-h2",
         "theme": "shared_trunk_ensemble",
         "hypothesis": (
