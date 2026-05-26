@@ -4,6 +4,14 @@ from __future__ import annotations
 
 HYPOTHESES: list[dict[str, str]] = [
     {
+        "hypothesis_id": "model_architecture-h3",
+        "theme": "width-adaptive-kwta",
+        "hypothesis": "BasicBlock and the ResNet stem in model.py hard-code KWTA(k=10) while planes scale 64→512, so active fraction swings from 15.6% (64 ch) to 1.95% (512 ch)—an 8× sparsity mismatch that over-prunes deep features without saving latency because torch.topk cost grows with channel width. Using k=max(8, planes//8) per KWTA site holds ~12.5% density at every depth, keeps the same 17 (or h2-reduced) top-k call count, and should remain under the 13 ms latency gate.",
+        "planned_change": "Mark width-adaptive k (planes//8) as the next KWTA hyperparameter experiment before editing BasicBlock/ResNet __init__ wiring.",
+        "run_id": "run_654baef80b2d",
+        "timestamp": "2026-05-26T00:04:15.978802+00:00"
+    },
+    {
         "hypothesis_id": "model_architecture-h2",
         "theme": "staged-kwta-latency",
         "hypothesis": "ResNet18 in model.py applies KWTA(k=10) at 17 points (stem plus two per BasicBlock) with fixed k regardless of channel width (64→512). For 28×28 MNIST, retaining KWTA only in stages 1–2 and swapping deeper KWTA for ReLU removes ~8 top-k ops on high-channel 7×7/3×3 maps, preserving the 13 ms latency budget while keeping early activation sparsity that h1 targets.",
