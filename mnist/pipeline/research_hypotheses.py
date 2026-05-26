@@ -7,6 +7,29 @@ from __future__ import annotations
 
 RESEARCH_HYPOTHESES: list[dict] = [
     {
+        "hypothesis_id": "model_architecture-h2",
+        "theme": "shared_trunk_ensemble",
+        "hypothesis": (
+            "EnsembleMnistCNN (train.py defaults: num_sub_networks=3, kwta_k=1) runs "
+            "three full independent ResNet18 forwards per sample via "
+            "torch.stack([model(x) for model in self.models]) in train_optuna.py, so "
+            "inference latency scales ~linearly with sub-network count while only the "
+            "top-1 logit vote is used. mnist/baseline.json requires latency_ms <= 13.0 "
+            "at accuracy >= 0.985. A single shared trunk through ResNet layer3 with "
+            "three lightweight layer4+linear heads and the same ensemble top-k at logits "
+            "should preserve kWTA voting diversity at roughly one shared-backbone pass "
+            "instead of three full copies."
+        ),
+        "planned_change": (
+            "In mnist/pipeline/model.py: add SharedTrunkEnsembleMnistCNN with one "
+            "ResNet18 trunk through layer3 and three head branches; refactor "
+            "EnsembleMnistCNN forward to use it (or delegate); align train.py and "
+            "mnist/eval/run_eval.py checkpoint wiring; re-measure latency_ms."
+        ),
+        "run_id": "run_b8a45c0f3c54",
+        "timestamp": "2026-05-26T00:19:13.851679+00:00",
+    },
+    {
         "hypothesis_id": "model_architecture-h1",
         "theme": "ensemble_inference_cost",
         "hypothesis": (
