@@ -9,9 +9,10 @@ AGENT_COMMAND="${HAC_AGENT_COMMAND:-}"
 AGENT_BACKEND="${HAC_AGENT_BACKEND:-cursor_sdk}"
 AGENT_MODEL="${HAC_AGENT_MODEL:-composer-2.5}"
 
+PYTHON="${HAC_PYTHON:-${ROOT}/.venv/bin/python}"
 export PYTHONPATH="$ROOT"
 
-python -m hiagentresearch.src.orchestrator init
+"$PYTHON" -m hiagentresearch.src.orchestrator init
 run_args=(
   --group-id "$GROUP_ID"
   --workdir "$WORKDIR"
@@ -23,4 +24,4 @@ run_args=(
 if [[ -n "$AGENT_COMMAND" ]]; then
   run_args+=(--agent-command "$AGENT_COMMAND")
 fi
-python -m hiagentresearch.src.orchestrator run-group "${run_args[@]}"
+"$PYTHON" -m hiagentresearch.src.orchestrator run-group "${run_args[@]}"

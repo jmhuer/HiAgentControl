@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PYTHON="${ROOT}/.venv/bin/python"
+PYTHON="${HAC_PYTHON:-${ROOT}/.venv/bin/python}"
 GROUP_ID="${1:-model_architecture}"
 BRANCH="${2:-research/model-architecture}"
 LOOPS="${3:-3}"

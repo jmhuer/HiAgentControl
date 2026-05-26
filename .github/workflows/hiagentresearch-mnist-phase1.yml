@@ -47,10 +47,10 @@ jobs:
             gid="$input_group"
           else
             case "$branch" in
-              research/model-architecture) gid="model_architecture" ;;
-              research/hyperparameter-optimization) gid="hyperparameter_optimization" ;;
-              research/data-augmentation) gid="data_augmentation" ;;
-              research/optimization-strategy) gid="optimization_strategy" ;;
+              research/model-architecture*) gid="model_architecture" ;;
+              research/hyperparameter-optimization*) gid="hyperparameter_optimization" ;;
+              research/data-augmentation*) gid="data_augmentation" ;;
+              research/optimization-strategy*) gid="optimization_strategy" ;;
               *) gid="unknown" ;;
             esac
           fi
